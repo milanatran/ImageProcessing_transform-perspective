@@ -102,36 +102,70 @@ public class GeometricTransform {
 					for(int yd = 0; yd < dst.height; yd++) {
 						
 						//dst Bild verschieben
-						double xd1 = xd - (dst.width-1) /2;
-						double yd1 = yd - (dst.height-1) /2;
+						double xd1 = xd - (dst.width) /2;
+						double yd1 = yd - (dst.height) /2;
 						
 						//Perspektivdaten berechnen
 						double ys = yd1 / (Math.cos(phi) - perspectiveDistortion * Math.sin(phi) * yd1);
 						double xs = xd1 * (perspectiveDistortion * Math.sin(phi) * ys +1);
 						
 						//src Bild zurückverschieben
-						double ys1 = ys+ (src.height-1) /2;
-						double xs1 = xs+ (src.width-1) /2;
+						double ys1 = ys+ (src.height) /2;
+						double xs1 = xs+ (src.width) /2;
 						//Bilineare Interpolation
 						int ysINT = (int) ys1;
 						int xsINT = (int) xs1;
 						
 						double v = ys1 - ysINT;
 						double h = xs1 - xsINT;
-						int rn = 0;
-						int gn = 0;
-						int bn = 0;
 						
+						//neighbouring values
+						int rA = 255; int rB = 255; int rC = 255; int rD = 255;
+						int gA = 255; int gB = 255; int gC = 255; int gD = 255;
+						int bA = 255; int bB = 255; int bC = 255; int bD = 255;
 						
-//							
-//							rn = (int) Math.round(rA * (1-h) * (1-v) + rB * h * (1-v) + rC * (1-h) * v + rD * h * v);
-//							gn = (int) Math.round(gA * (1-h) * (1-v) + gB * h * (1-v) + gC * (1-h) * v + gD * h * v);
-//							bn = (int) Math.round(bA * (1-h) * (1-v) + bB * h * (1-v) + bC * (1-h) * v + bD * h * v);
-//						
+						//difference between coordinates of src and dst (dst is bigger than src)
+						int smallestSrcCoordinateX = dst.width - src.width; 
+						int smallestSrcCoordinateY = dst.height - src.height;
 						
+						if(!(xsINT < smallestSrcCoordinateX || xsINT >= src.width + smallestSrcCoordinateX) && !(ysINT < smallestSrcCoordinateY || ysINT >= src.height + smallestSrcCoordinateY)) {
+							//if (xsINT - smallestSrcCoordinateX >= 0 && ysINT - smallestSrcCoordinateY >= 0) {
+							if(!(xsINT < 0 || xsINT >= src.width || ysINT < 0 || ysINT >= src.height)) {
+								int argbA = src.argb[pos(xsINT - smallestSrcCoordinateX, ysINT - smallestSrcCoordinateY, src)];
+								rA = (argbA >> 16) & 0xff;
+								gA = (argbA >> 8) & 0xff;
+								bA = argbA & 0xff;
+							}
+							//if (xsINT - smallestSrcCoordinateX + 1 < src.width && ysINT - smallestSrcCoordinateY >= 0) {
+							if(!(xsINT < 0 || xsINT+1 >= src.width || ysINT < 0 || ysINT +1 >= src.height)) {
+								int argbB = src.argb[pos(xsINT - smallestSrcCoordinateX + 1, ysINT - smallestSrcCoordinateY, src)];
+								rB = (argbB >> 16) & 0xff;
+								gB = (argbB >> 8) & 0xff;
+								bB = argbB & 0xff;
+							}
+							//if (xsINT - smallestSrcCoordinateX >= 0 && ysINT - smallestSrcCoordinateY + 1 < src.height) { 
+							if(!(xsINT < 0 || xsINT+1 >= src.width || ysINT < 0 || ysINT +1 >= src.height)) {
+								int argbC = src.argb[pos(xsINT - smallestSrcCoordinateX, ysINT - smallestSrcCoordinateY + 1, src)];
+								rC = (argbC >> 16) & 0xff;
+								gC = (argbC >> 8) & 0xff;
+								bC = argbC & 0xff;
+							}
+							//if (xsINT - smallestSrcCoordinateX + 1 < src.width && ysINT - smallestSrcCoordinateY + 1 < src.height) {
+							if(!(xsINT < 0 || xsINT+1 >= src.width || ysINT < 0 || ysINT +1 >= src.height)) {
+								int argbD = src.argb[pos(xsINT - smallestSrcCoordinateX + 1, ysINT - smallestSrcCoordinateY + 1, src)];
+								rD = (argbD >> 16) & 0xff;
+								gD = (argbD >> 8) & 0xff;
+								bD = argbD & 0xff;
+							}
+						}
+						// ^ verschiebt bild, schneidet es ab, innerhalb d. bildes bilinear okay, rand nicht
+						int rn = (int) Math.round(rA * (1-h) * (1-v) + rB * h * (1-v) + rC * (1-h) * v + rD * h * v);
+						int gn = (int) Math.round(gA * (1-h) * (1-v) + gB * h * (1-v) + gC * (1-h) * v + gD * h * v);
+						int bn = (int) Math.round(bA * (1-h) * (1-v) + bB * h * (1-v) + bC * (1-h) * v + bD * h * v);
 						
+						//just noticed, that this makes a bilinear version of the original and only then puts the  angle on the sides.....
 						
-						//Punkt A
+/*						//Punkt A
 						if(xsINT < 0 || xsINT >= src.width || ysINT < 0 || ysINT >= src.height) {
 							rn = (int) Math.round(255 * (1-h) * (1-v));
 							gn = (int) Math.round(255 * (1-h) * (1-v));
@@ -193,7 +227,7 @@ public class GeometricTransform {
 							bn = (int) Math.round(bn + bD * h * v);
 							
 						}
-						
+*/						
 						//Plan: alles in eine formel
 						
 //						int xsINT = (int) xs1;
@@ -219,6 +253,10 @@ public class GeometricTransform {
 				}
  	}
 
+	private int pos(int x, int y, RasterImage image) {
+		int pos = x + y * image.width;
+		return pos;
+	}
  		   		     	
 }
  		   		     	
